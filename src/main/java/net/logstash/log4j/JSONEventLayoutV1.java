@@ -11,6 +11,7 @@ import org.apache.log4j.spi.LoggingEvent;
 import org.apache.log4j.spi.ThrowableInformation;
 
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.TimeZone;
 
@@ -129,7 +130,7 @@ public class JSONEventLayoutV1 extends Layout {
         }
 
         addEventData("logger_name", loggingEvent.getLoggerName());
-        addEventData("mdc", mdc);
+        addEventData("mdc", repleaceDotsInMap(mdc, "_"));
         addEventData("ndc", ndc);
         addEventData("level", loggingEvent.getLevel().toString());
         addEventData("thread_name", threadName);
@@ -183,5 +184,38 @@ public class JSONEventLayoutV1 extends Layout {
         if (null != keyval) {
             logstashEvent.put(keyname, keyval);
         }
+    }
+    
+    /**
+     * Parses Map recursively and replaces all dots (.) in keys with given String.
+     * 
+     * Elasticsearch 2.0 no longer supports dots in name of keys. This method will
+     * replace all dots recursively from map with given String.
+     * 
+     * @param map Map for parsing.
+     * @return parsed map.
+     */
+    @SuppressWarnings("rawtypes")
+    public Map repleaceDotsInMap(Map map, String repleaceString) {
+       // Creates HashMaps for parsed map.
+       HashMap<String, Object> parsedMap = new HashMap<String, Object>();
+       
+       // Iterates original map.
+       Iterator iterator = map.entrySet().iterator();
+       while(iterator.hasNext()) {
+          Map.Entry pair = (Map.Entry) iterator.next();
+          String originalKey = pair.getKey().toString();
+          String parsedKey = originalKey.replaceAll("\\.", repleaceString);
+          
+          // In case of value being Map, recursively call this method.
+          if(pair.getValue() instanceof Map) {
+             Map innerParsedMap = repleaceDotsInMap((Map) pair.getValue(), repleaceString);
+             parsedMap.put(parsedKey, innerParsedMap);
+          } else {
+             parsedMap.put(parsedKey, pair.getValue());
+          }
+       }
+       
+       return parsedMap;
     }
 }
